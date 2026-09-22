@@ -45,9 +45,11 @@ jobs:
           if git tag -l "v${VERSION}"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "Version v${VERSION} already exists. Check the version in package.json."
+            echo "Version v${VERSION} already exists. Check the version in package.json." >> $GITHUB_STEP_SUMMARY
             exit 1;
           else
             echo "New version found: v${VERSION}"
+            echo "New version found: v${VERSION}" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Display Tag Info in Job Summary
