@@ -114,7 +114,7 @@ jobs:
           VERSION: ${{ steps.get_version.outputs.version }}
           TAG: ${{ steps.get_version.outputs.tag }}
         run: |
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
+          if [ -n "$(git tag -l "v${TAG}")" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "A tag $TAG já existe."
           else
