@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Extract version from package.json
         id: get_version
@@ -42,6 +44,10 @@ jobs:
         env:
           VERSION: ${{ steps.get_version.outputs.version}}
         run: |
+          echo "VERSION=[$VERSION]"
+          echo "Procurando tag: [v${VERSION}]"
+          echo "Tags disponíveis:"
+          git tag -l
           if [ -n "$(git tag -l "v${VERSION}")" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "Version v${VERSION} already exists. Check the version in package.json."
