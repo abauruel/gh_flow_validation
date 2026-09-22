@@ -42,12 +42,13 @@ jobs:
         env:
           VERSION: ${{ steps.get_version.outputs.version}}
         run: |
-          if git tag -l | grep "v$VERSION"; then
+          if git tag -l "v${VERSION}" | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "version already exist, check you version on package.json"
+            echo "Version v${VERSION} already exists. Check the version in package.json."
             exit 1;
           else
-            echo "new version found"
+            echo "New version found: v${VERSION}"
+          fi
 
       - name: Display Tag Info in Job Summary
         run: |
