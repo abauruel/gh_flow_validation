@@ -38,6 +38,17 @@ jobs:
           echo "Versão extraída de package.json: ${VERSION}"
           echo "Tag correspondente: ${TAG}"
 
+      - name: Check current version
+        env:
+          VERSION: ${{ steps.get_version.outputs.version}}
+        run: |
+          if git tag -l | grep "v$VERSION"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "version already exist, check you version on package.json"
+            exit 1;
+          else
+            echo "new version found"
+
       - name: Display Tag Info in Job Summary
         run: |
           echo "### 🏷️ Informação da Tag de Release para o PR" >> $GITHUB_STEP_SUMMARY
@@ -128,6 +139,8 @@ jobs:
 
       - name: Notify Existing Tag
         if: steps.check_tag.outputs.exists == 'true'
+        env:
+          TAG: ${{ steps.get_version.outputs.tag }}
         run: |
           echo "### ⚠️ Tag já existente" >> $GITHUB_STEP_SUMMARY
           echo "A tag **\`$TAG\`** já existe no repositório. Nenhuma nova tag foi criada." >> $GITHUB_STEP_SUMMARY
