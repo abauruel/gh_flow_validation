@@ -1,0 +1,119 @@
+name: Tag Release on Develop Merge & PR Version Check
+
+on:
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - 'content/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pr-version-check:
+    name: Check & Inform Tag for PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.get_version.outputs.version}}
+      app_tag: ${{ steps.get_version.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from package.json
+        id: get_version
+        run: |
+          VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Versão extraída de package.json: ${VERSION}"
+          echo "Tag correspondente: ${TAG}"
+
+      - name: Display Tag Info in Job Summary
+        run: |
+          echo "### 🏷️ Informação da Tag de Release para o PR" >> $GITHUB_STEP_SUMMARY
+          echo "**Versão no \`package.json\`:** \`${{ steps.get_version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag que será gerada após o merge em \`develop\`:** \`${{ steps.get_version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment Tag Info on Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = "${{ steps.get_version.outputs.tag }}";
+            const version = "${{ steps.get_version.outputs.version }}";
+            const body = `### 🏷️ Informação da Tag de Release\n\nAo realizar o merge deste Pull Request na branch **\`develop\`**, será criada automaticamente a tag **\`${tag}\`** (referente à versão \`${version}\` definida em \`package.json\`).`;
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => c.body.includes("Informação da Tag de Release"));
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+  create-release-tag:
+    needs: pr-version-check
+    name: Create Tag on Develop Merge
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          VERSION: ${{ needs.pr-version-check.outputs.app_version }}
+          TAG: ${{ needs.pr-version-check.outputs.app_tag}}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if Tag Exists
+        id: check_tag
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "A tag $TAG já existe."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "A tag $TAG ainda não existe."
+          fi
+
+      - name: Create and Push Git Tag
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "$TAG" -m "Release $TAG (versão $VERSION em package.json)"
+          git push origin "$TAG"
+          
+          echo "### ✅ Tag criada com sucesso!" >> $GITHUB_STEP_SUMMARY
+          echo "A tag **\`$TAG\`** (versão \`$VERSION\`) foi criada e enviada para a branch \`develop\`." >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify Existing Tag
+        if: steps.check_tag.outputs.exists == 'true'
+        run: |
+          echo "### ⚠️ Tag já existente" >> $GITHUB_STEP_SUMMARY
+          echo "A tag **\`$TAG\`** já existe no repositório. Nenhuma nova tag foi criada." >> $GITHUB_STEP_SUMMARY
