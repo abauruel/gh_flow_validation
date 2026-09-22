@@ -9,7 +9,7 @@ on:
   pull_request:
     branches:
       - develop
-    types: [opened]
+    types: [opened, reopened ]
   workflow_dispatch:
 
 permissions:
@@ -37,6 +37,20 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Versão extraída de package.json: ${VERSION}"
           echo "Tag correspondente: ${TAG}"
+
+      - name: Check current version
+        env:
+          VERSION: ${{ steps.get_version.outputs.version}}
+        run: |
+          if [ -n "$(git tag -l "v${VERSION}")" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Version v${VERSION} already exists. Check the version in package.json."
+            echo "Version v${VERSION} already exists. Check the version in package.json." >> $GITHUB_STEP_SUMMARY
+            exit 1;
+          else
+            echo "New version found: v${VERSION}"
+            echo "New version found: v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Display Tag Info in Job Summary
         run: |
@@ -128,6 +142,8 @@ jobs:
 
       - name: Notify Existing Tag
         if: steps.check_tag.outputs.exists == 'true'
+        env:
+          TAG: ${{ steps.get_version.outputs.tag }}
         run: |
           echo "### ⚠️ Tag já existente" >> $GITHUB_STEP_SUMMARY
           echo "A tag **\`$TAG\`** já existe no repositório. Nenhuma nova tag foi criada." >> $GITHUB_STEP_SUMMARY
