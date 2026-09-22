@@ -6,6 +6,10 @@ on:
       - develop
     paths-ignore:
       - 'content/**'
+  pull_request:
+    branches:
+      - develop
+    types: [opened]
   workflow_dispatch:
 
 permissions:
@@ -72,21 +76,30 @@ jobs:
             }
 
   create-release-tag:
-    needs: pr-version-check
     name: Create Tag on Develop Merge
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ needs.pr-version-check.outputs.app_version }}
-      TAG: ${{ needs.pr-version-check.outputs.app_tag}}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Extract version from package.json
+        id: get_version
+        run: |
+          VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Versão extraída de package.json: ${VERSION}"
+          echo "Tag correspondente: ${TAG}"
+
       - name: Check if Tag Exists
         id: check_tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+          TAG: ${{ steps.get_version.outputs.tag }}
         run: |
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -100,6 +113,8 @@ jobs:
         if: steps.check_tag.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+          TAG: ${{ steps.get_version.outputs.tag }}
         run: |
           
           git config user.name "github-actions[bot]"
