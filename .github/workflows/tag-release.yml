@@ -76,11 +76,10 @@ jobs:
     name: Create Tag on Develop Merge
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.pr-version-check.outputs.app_version }}
+      TAG: ${{ needs.pr-version-check.outputs.app_tag}}
     steps:
-      - env:
-          VERSION: ${{ needs.pr-version-check.outputs.app_version }}
-          TAG: ${{ needs.pr-version-check.outputs.app_tag}}
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
